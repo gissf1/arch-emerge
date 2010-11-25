@@ -43,6 +43,7 @@ extras() {
 	done
 }
 
+[ -f $PACSYNC_CACHE/explicit.cache ] || import_set world > $PACSYNC_CACHE/explicit.cache
 for d in $(find $PACSYNC_CONF -exec stat '{}' -c %Y ';'); do
 	if expr $d '>' $(stat $PACSYNC_CACHE/explicit.cache -c %Y) > /dev/null; then
 		import_set world > $PACSYNC_CACHE/explicit.cache
