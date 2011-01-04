@@ -78,6 +78,10 @@ if [ -n "$explicit_add" ]; then
 		fi
 	done
 fi
-[ -z "$toinstall" ] || pacman -Su --noconfirm $toinstall || exit 1
+if [ -n "$toinstall" ]; then
+	pacman -Su --noconfirm $toinstall || exit 1
+else
+	pacman -Su --noconfirm
+fi
 orphans=$(pacman -Qqtd)
 [ -z "$orphans" ] || pacman -Rs --noconfirm $orphans || exit 1
