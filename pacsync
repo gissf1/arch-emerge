@@ -1,7 +1,6 @@
 #!/bin/bash
 
 PACSYNC_CONF=${PACSYNC_CONF:-/etc/pacsync}
-PACSYNC_CACHE=${PACSYNC_CACHE:-/var/cache/pacsync}
 
 list_doesnot_contain() {
 	local target="$1"
@@ -49,18 +48,10 @@ extras() {
 	done
 }
 
-[ -f $PACSYNC_CACHE/explicit.cache ] || import_set world > $PACSYNC_CACHE/explicit.cache
-for d in $(find $PACSYNC_CONF -exec stat '{}' -c %Y ';'); do
-	if expr $d '>' $(stat $PACSYNC_CACHE/explicit.cache -c %Y) > /dev/null; then
-		import_set world > $PACSYNC_CACHE/explicit.cache
-		break
-	fi
-done
+explicit=$(import_set world)
 
-explicit="cat $PACSYNC_CACHE/explicit.cache"
-
-explicit_rm=$(pacman -Qqe|extras $($explicit))
-explicit_add=$($explicit|extras $(pacman -Qqe))
+explicit_rm=$(pacman -Qqe|extras $explicit)
+explicit_add=$(echo $explicit|extras $(pacman -Qqe))
 
 cat  <<!
 The following packages will be added to the explict set:
