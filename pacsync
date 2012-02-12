@@ -27,8 +27,14 @@ filter_conf() {
 }
 
 import_set() {
-	local include=$(cat $PACSYNC_CONF/$1.set|filter_conf)
-	local mask=$(cat $PACSYNC_CONF/$1.mask|filter_conf)
+	local includecmd="$PACSYNC_CONF/$1.set"
+	local maskcmd="$PACSYNC_CONF/$1.mask"
+
+	[ -x "$includecmd" ] || includecmd="cat $includecmd"
+	[ -x "$maskcmd" ] || maskcmd="cat $maskcmd"
+
+	local include=$($includecmd|filter_conf)
+	local mask=$($maskcmd|filter_conf)
 	for pkg in $include; do
 		if list_doesnot_contain $pkg $mask ; then
 			echo $pkg

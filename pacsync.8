@@ -16,7 +16,7 @@ Configuration files for pacsync belong in the directory contained in
 $PACSYNC_CONF, or /etc/pacsync if it is not defined. The configuration defines
 sets of packages. Each set comes in the form of a pair of files, <setname>.set
 and <setname>.mask, where <setname> is the name of the set. The .set file
-contains a list of packages, groups, and other sets that should be included
+specifies a list of packages, groups, and other sets that should be included
 in the file. The .mask file is of the same form, but specifies packages,
 groups, and other sets that should be ommitted from the set, even if would
 otherwise be included. The form of these files is a series of lines, each of
@@ -30,10 +30,14 @@ all packages in world are explicitly installed, no other packages are
 installed explicitly, and only packages in world and their dependencies (both
 direct and indirect) are installed.
 
+If the user running pacsync (typically root) has execute permissions on a .set
+or .mask file, then instead of reading from the file, the file will be executed
+and it's output will be used.
+
 .SH EXAMPLES
 
-A set which contains all of the xorg group except for xf86-video-vesa and
-xorg-twm, plus xf86-video-intel and xf86-input-synaptics:
+A set which contains all of the xorg group except for those packages in the xorg-drivers
+group, plus xf86-video-intel and xf86-input-synaptics:
 
 .B x11.set:
 
@@ -46,8 +50,7 @@ xf86-input-synaptics
 .B x11.mask:
 
 .nf
-xf86-video-vesa
-xorg-twm
+@xorg-drivers
 .fi
 
 A set which contains all of kde, except for the kdegames group:
@@ -76,6 +79,17 @@ A possible world set for a kde desktop machine, given the two sets above:
 .fi
 
 (world.mask is empty)
+
+If the same groups of packages, with slight variations are to be used on multiple machines,
+world.set can be made executable, and contain:
+
+.nf
+#!/bin/sh
+
+echo '<'`hostname`
+.fi
+
+Then, individual sets for each host can be created. They may include common sets.
 
 .SH ENVIRONMENT VARIABLES
 
