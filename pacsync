@@ -44,7 +44,9 @@ import_set() {
 extras() {
 	local line
 	while read line; do
-		list_doesnot_contain $line $@ && echo $line
+		for pkg in $line; do
+			list_doesnot_contain $pkg $@ && echo $pkg
+		done
 	done
 }
 
