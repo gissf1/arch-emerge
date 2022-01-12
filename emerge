@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PACSYNC_CONF=${PACSYNC_CONF:-/etc/pacsync}
+EMERGE_CONF=${EMERGE_CONF:-/etc/emerge}
 
 list_doesnot_contain() {
 	local target="$1"
@@ -26,8 +26,8 @@ filter_conf() {
 }
 
 import_set() {
-	local includecmd="$PACSYNC_CONF/$1.set"
-	local maskcmd="$PACSYNC_CONF/$1.mask"
+	local includecmd="$EMERGE_CONF/$1.set"
+	local maskcmd="$EMERGE_CONF/$1.mask"
 
 	[ -x "$includecmd" ] || includecmd="cat $includecmd"
 	[ -x "$maskcmd" ] || maskcmd="cat $maskcmd"
