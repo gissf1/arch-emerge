@@ -3,6 +3,9 @@
 EMERGE_CONF=${EMERGE_CONF:-/etc/emerge}
 
 PACMAN='pacman'
+if [ -e "$EMERGE_CONF/emerge.conf" ]; then
+	. "$EMERGE_CONF/emerge.conf"
+fi
 
 list_doesnot_contain() {
 	local target="$1"
