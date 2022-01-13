@@ -2,6 +2,8 @@
 
 EMERGE_CONF=${EMERGE_CONF:-/etc/emerge}
 
+PACMAN='pacman'
+
 list_doesnot_contain() {
 	local target="$1"
 	shift
@@ -18,7 +20,7 @@ filter_conf() {
 		if [ -n "$(echo $line|grep '^<')" ]; then
 			import_set $(echo $line|sed 's/^<//')
 		elif [ -n "$(echo $line|grep '^@')" ]; then
-			pacman -Sqg $(echo $line|sed 's/^@//')
+			$PACMAN -Sqg $(echo $line|sed 's/^@//')
 		else 
 			echo $line
 		fi
@@ -52,8 +54,8 @@ extras() {
 
 explicit=$(import_set world)
 
-explicit_rm=$(pacman -Qqe|extras $explicit)
-explicit_add=$(echo $explicit|extras $(pacman -Qqe))
+explicit_rm=$($PACMAN -Qqe|extras $explicit)
+explicit_add=$(echo $explicit|extras $($PACMAN -Qqe))
 
 cat  <<!
 The following packages will be added to the explict set:
@@ -67,20 +69,20 @@ press enter to continue, or Ctrl-C to stop.
 read
 
 toinstall=""
-[ -z "$explicit_rm" ] || pacman -D --asdeps $explicit_rm || exit 1
+[ -z "$explicit_rm" ] || $PACMAN -D --asdeps $explicit_rm || exit 1
 if [ -n "$explicit_add" ]; then
 	for pkg in $explicit_add; do
-		if pacman -Q "$pkg" > /dev/null 2>&1; then
-			pacman -D --asexplicit $pkg
+		if $PACMAN -Q "$pkg" > /dev/null 2>&1; then
+			$PACMAN -D --asexplicit $pkg
 		else
 			toinstall="$toinstall $pkg"
 		fi
 	done
 fi
 if [ -n "$toinstall" ]; then
-	pacman -Su --noconfirm $toinstall || exit 1
+	$PACMAN -Su --noconfirm $toinstall || exit 1
 else
-	pacman -Su --noconfirm
+	$PACMAN -Su --noconfirm
 fi
-orphans=$(pacman -Qqtd)
-[ -z "$orphans" ] || pacman -Rs --noconfirm $orphans || exit 1
+orphans=$($PACMAN -Qqtd)
+[ -z "$orphans" ] || $PACMAN -Rs --noconfirm $orphans || exit 1
