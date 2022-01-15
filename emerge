@@ -55,6 +55,7 @@ extras() {
 	done
 }
 
+pacsync_update_world() {
 explicit=$(import_set world)
 
 explicit_rm=$($PACMAN -Qqe|extras $explicit)
@@ -89,3 +90,6 @@ else
 fi
 orphans=$($PACMAN -Qqtd)
 [ -z "$orphans" ] || $PACMAN -Rs --noconfirm $orphans || exit 1
+}
+
+pacsync_update_world
