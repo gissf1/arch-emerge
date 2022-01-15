@@ -24,10 +24,10 @@ filter_conf() {
 			import_set $(echo $line|sed 's/^<//')
 		elif [ -n "$(echo $line|grep '^@')" ]; then
 			$PACMAN -Sqg $(echo $line|sed 's/^@//')
-		else 
+		else
 			echo $line
 		fi
-	done		
+	done
 }
 
 import_set() {
