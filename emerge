@@ -133,8 +133,11 @@ rebuild_world_set() {
 	local REQDBY
 	local GROUP
 	local PARENTS
+	local PARENT
 	local CHILDREN
+	local LINE
 	echo ">>> checking for dependencies..."
+	[ -f "$SETFILE.checkdeps" ] && rm "$SETFILE.checkdeps"
 	[ -f "$SETFILE.checkdeps.groups" ] && rm "$SETFILE.checkdeps.groups"
 	local PKGIDX=0
 	local RAWLINES=$( wc -l < "$SETFILE.raw" )
@@ -155,6 +158,7 @@ rebuild_world_set() {
 			done
 		fi
 		if [ -n "$PARENTS" ]; then
+			printf "%-20s:%s\n" "$PKG" "$PARENTS" >> "$SETFILE.checkdeps"
 			for GROUP in $PARENTS ; do
 				if [[ $GROUP =~ ^@ ]]; then
 					GROUP=${GROUP#@}
@@ -170,6 +174,44 @@ rebuild_world_set() {
 	[ -f /tmp/emerge_pacman_Qi ] && rm /tmp/emerge_pacman_Qi
 	# uniqify group list
 	sort -u "$SETFILE.checkdeps.groups" > "$SETFILE.checkdeps.groups.tmp" && mv "$SETFILE.checkdeps.groups.tmp" "$SETFILE.checkdeps.groups"
+	# change dependency of packages that would be included anyhow
+	echo ">>> simplify package list with deep dependency checks..."
+	while read LINE ; do
+		LINE=$( sed -r 's/^(\S+) +: +/\1\t/g ; s/@\S+( +|$)//g' <<<"$LINE" )
+		read PKG PGROUPS <<<"$LINE"
+		if ! fgrep -xq "$PKG" "$SETFILE.raw" ; then
+			true
+		elif [ -n "$PGROUPS" ]; then
+			echo -n "$PKG is explicit in set"
+			REQDBY=""
+			for PARENT in $PGROUPS ; do
+				if $PACMAN -T "$PARENT" >/dev/null ; then
+					REQDBY="$REQDBY $PARENT"
+				fi
+			done
+			if [ -n "$REQDBY" ]; then
+				echo ", but gets pulled in by:$REQDBY"
+				fgrep -xv "$PKG" "$SETFILE.raw" > "$SETFILE.tmp" && mv "$SETFILE.tmp" "$SETFILE.raw"
+				echo "$PKG" >> "$SETFILE.was_explicit"
+			else
+				echo -en "\r                                        \r"
+			fi
+		fi
+	done < "$SETFILE.checkdeps"
+	if [ -s "$SETFILE.was_explicit" ]; then
+		echo ">>> marking explicit packages as deps when also included..."
+		if [ "$UID" == 0 -o "$EUID" == 0 ]; then
+			$PACMAN -D --asdeps $( cat "$SETFILE.was_explicit" )
+			rm "$SETFILE.was_explicit"
+		else
+			echo "**********************************************" >&2
+			echo "*** current user is not root" >&2
+			echo "*** unable to mark explicit packages: $( cat "$SETFILE.was_explicit" )" >&2
+			echo "*** explicit package list is preserved at: $SETFILE.was_explicit" >&2
+			echo "*** run the following as root: $PACMAN -D --asdeps \$( cat \"$SETFILE.was_explicit\" )" >&2
+			echo "**********************************************" >&2
+		fi
+	fi
 	# replace group children with @group
 	echo ">>> checking for dependencies in groups..."
 	for GROUP in $( cat "$SETFILE.checkdeps.groups" ) ; do
@@ -189,6 +231,7 @@ rebuild_world_set() {
 	echo ">>> moving temporary file to $SETFILE"
 	mv "$SETFILE.raw" "$SETFILE"
 	echo ">>> cleaning up..."
+	[ -f "$SETFILE.checkdeps" ] && rm "$SETFILE.checkdeps"
 	[ -f "$SETFILE.checkdeps.groups" ] && rm "$SETFILE.checkdeps.groups"
 }
 
