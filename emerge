@@ -85,40 +85,40 @@ extras() {
 }
 
 pacsync_update_world() {
-explicit=$(import_set world)
+	explicit=$(import_set world)
 
-explicit_rm=$($PACMAN -Qqe|extras $explicit)
-explicit_add=$(echo $explicit|extras $($PACMAN -Qqe))
+	explicit_rm=$($PACMAN -Qqe|extras $explicit)
+	explicit_add=$(echo $explicit|extras $($PACMAN -Qqe))
 
-cat  <<!
-The following packages will be added to the explict set:
-$explicit_add
+	cat  <<!
+	The following packages will be added to the explict set:
+	$explicit_add
 
-The following packages will be removed from the explicit set:
-$explicit_rm
+	The following packages will be removed from the explicit set:
+	$explicit_rm
 
-press enter to continue, or Ctrl-C to stop.
+	press enter to continue, or Ctrl-C to stop.
 !
-read
+	read
 
-toinstall=""
-[ -z "$explicit_rm" ] || $PACMAN -D --asdeps $explicit_rm || exit 1
-if [ -n "$explicit_add" ]; then
-	for pkg in $explicit_add; do
-		if $PACMAN -Q "$pkg" > /dev/null 2>&1; then
-			$PACMAN -D --asexplicit $pkg
-		else
-			toinstall="$toinstall $pkg"
-		fi
-	done
-fi
-if [ -n "$toinstall" ]; then
-	$PACMAN -Su$PACMAN_S_OPTS $toinstall || exit 1
-else
-	$PACMAN -Su$PACMAN_S_OPTS
-fi
-orphans=$( $PACMAN -Qqtd | filter_exclude_optdepended )
-[ -z "$orphans" ] || $PACMAN -Rs$PACMAN_R_OPTS $orphans || exit 1
+	toinstall=""
+	[ -z "$explicit_rm" ] || $PACMAN -D --asdeps $explicit_rm || exit 1
+	if [ -n "$explicit_add" ]; then
+		for pkg in $explicit_add; do
+			if $PACMAN -Q "$pkg" > /dev/null 2>&1; then
+				$PACMAN -D --asexplicit $pkg
+			else
+				toinstall="$toinstall $pkg"
+			fi
+		done
+	fi
+	if [ -n "$toinstall" ]; then
+		$PACMAN -Su$PACMAN_S_OPTS $toinstall || exit 1
+	else
+		$PACMAN -Su$PACMAN_S_OPTS
+	fi
+	orphans=$( $PACMAN -Qqtd | filter_exclude_optdepended )
+	[ -z "$orphans" ] || $PACMAN -Rs$PACMAN_R_OPTS $orphans || exit 1
 }
 
 rebuild_world_set() {
