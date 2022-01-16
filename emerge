@@ -30,6 +30,10 @@ filter_conf() {
 	done
 }
 
+filter_exclude_optdepended() {
+	xargs -r $PACMAN -Qi | awk '/^Name/{name=$3} /^Optional For\s*:\s*\S/{ if ( $4 == "None" ) { print name } }'
+}
+
 import_set() {
 	local includecmd="$EMERGE_CONF/$1.set"
 	local maskcmd="$EMERGE_CONF/$1.mask"
@@ -92,7 +96,7 @@ if [ -n "$toinstall" ]; then
 else
 	$PACMAN -Su --noconfirm
 fi
-orphans=$($PACMAN -Qqtd)
+orphans=$( $PACMAN -Qqtd | filter_exclude_optdepended )
 [ -z "$orphans" ] || $PACMAN -Rs --noconfirm $orphans || exit 1
 }
 
