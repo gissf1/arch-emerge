@@ -103,7 +103,64 @@ orphans=$( $PACMAN -Qqtd | filter_exclude_optdepended )
 rebuild_world_set() {
 	local SETFILE="$EMERGE_CONF/world.set"
 	echo ">>> generating world.set from current system pacman config..."
-	$PACMAN -Qqe > "$SETFILE"
+	$PACMAN -Qqe > "$SETFILE.raw"
+	# optimize world.set
+	local PKG
+	local PGROUPS
+	local REQDBY
+	local GROUP
+	local PARENTS
+	local CHILDREN
+	echo ">>> checking for dependencies..."
+	[ -f "$SETFILE.checkdeps.groups" ] && rm "$SETFILE.checkdeps.groups"
+	for PKG in $( cat "$SETFILE.raw" ) ; do
+		$PACMAN -Qi "$PKG" > /tmp/emerge_pacman_Qi
+		PGROUPS=$( egrep '^Groups *: ' < /tmp/emerge_pacman_Qi | cut -d: -f2 | sed -r 's/^ +//g ; s/ +$//g' )
+		REQDBY=$( egrep '^Required By *: ' < /tmp/emerge_pacman_Qi | cut -d: -f2 | sed -r 's/^ +//g ; s/ +$//g' )
+		# determine parents
+		PARENTS=""
+		if [ "$PGROUPS" != "None" ]; then
+			for GROUP in $PGROUPS ; do
+				PARENTS="$PARENTS @$GROUP"
+			done
+		fi
+		if [ "$REQDBY" != "None" ]; then
+			for GROUP in $REQDBY ; do
+				PARENTS="$PARENTS $GROUP"
+			done
+		fi
+		if [ -n "$PARENTS" ]; then
+			for GROUP in $PARENTS ; do
+				if [[ $GROUP =~ ^@ ]]; then
+					GROUP=${GROUP#@}
+					echo "$GROUP" >> "$SETFILE.checkdeps.groups"
+				fi
+			done
+		fi
+	done
+	[ -f /tmp/emerge_pacman_Qi ] && rm /tmp/emerge_pacman_Qi
+	# uniqify group list
+	sort -u "$SETFILE.checkdeps.groups" > "$SETFILE.checkdeps.groups.tmp" && mv "$SETFILE.checkdeps.groups.tmp" "$SETFILE.checkdeps.groups"
+	# replace group children with @group
+	echo ">>> checking for dependencies in groups..."
+	for GROUP in $( cat "$SETFILE.checkdeps.groups" ) ; do
+		CHILDREN=$( $PACMAN -Sg "$GROUP" | sed "s/^$GROUP //g" )
+		if [ -n "$CHILDREN" ] && $PACMAN -T $CHILDREN >/dev/null ; then
+			echo -n "replacing @$GROUP children in world.set: "
+			for PKG in $CHILDREN ; do
+				echo -n "$PKG "
+				egrep -v "^$PKG\$" "$SETFILE.raw" > "$SETFILE.tmp" && mv "$SETFILE.tmp" "$SETFILE.raw"
+			done
+			echo "@$GROUP" >> "$SETFILE.raw"
+			echo ""
+		fi
+	done
+	echo ">>> sorting packages..."
+	sort -u "$SETFILE.raw" > "$SETFILE.raw.tmp" && mv "$SETFILE.raw.tmp" "$SETFILE.raw"
+	echo ">>> moving temporary file to $SETFILE"
+	mv "$SETFILE.raw" "$SETFILE"
+	echo ">>> cleaning up..."
+	[ -f "$SETFILE.checkdeps.groups" ] && rm "$SETFILE.checkdeps.groups"
 }
 
 ensure_world_set_exists() {
