@@ -100,6 +100,23 @@ orphans=$( $PACMAN -Qqtd | filter_exclude_optdepended )
 [ -z "$orphans" ] || $PACMAN -Rs --noconfirm $orphans || exit 1
 }
 
+rebuild_world_set() {
+	echo ">>> generating world.set from current system pacman config..."
+	$PACMAN -Qqe > "$EMERGE_CONF/world.set"
+}
+
+ensure_world_set_exists() {
+	if [ ! -e "$EMERGE_CONF/world.set" ]; then
+		echo ">>> world set file '$EMERGE_CONF/world.set' does not exist."
+		rebuild_world_set
+	fi
+}
+
+pacman_update_world() {
+	ensure_world_set_exists
+	pacsync_update_world
+}
+
 show_help() {
 	cat <<<"
 usage: $( basename "$0" ) {-h|--help}
@@ -130,5 +147,5 @@ if [ "$HELP" != "0" ]; then
 	show_help
 	exit 1
 else
-	pacsync_update_world
+	pacman_update_world
 fi
