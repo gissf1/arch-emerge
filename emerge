@@ -287,6 +287,10 @@ standalone options:
 					searches package database names and info for search_terms
 general options:
        -a --ask         ask for user confirmation before proceeding
+       -e --emptytree   nothing; accepted for compatibility
+       -N --newuse      nothing; accepted for compatibility
+       -D --deep        nothing; accepted for compatibility
+       -v --verbose     nothing; accepted for compatibility
 "
 }
 
@@ -312,6 +316,19 @@ parseArgs() {
 						shift
 					else
 						ASK=1
+					fi
+					;;
+				# ignored arguments
+				-e|--emptytree) true ;;
+				-N|--newuse) true ;;
+				-D|--deep)
+					if [[ $1 =~ ^[0-9]+$ ]] ; then
+						shift
+					fi
+					;;
+				-v|--verbose)
+					if [[ $1 =~ ^[YNyn]$ ]] ; then
+						shift
 					fi
 					;;
 				world|@world) true ;;
