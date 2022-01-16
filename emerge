@@ -100,4 +100,35 @@ orphans=$( $PACMAN -Qqtd | filter_exclude_optdepended )
 [ -z "$orphans" ] || $PACMAN -Rs --noconfirm $orphans || exit 1
 }
 
-pacsync_update_world
+show_help() {
+	cat <<<"
+usage: $( basename "$0" ) {-h|--help}
+       $( basename "$0" ) [options] {world|@world}
+standalone options:
+       -h --help             show this help text
+"
+}
+
+# command line argument parsing for common emerge flags
+HELP=0
+while [[ $# -gt 0 ]]; do
+	ARG="$1"
+	shift
+		case "$ARG" in
+			-h|--help) HELP=1 ;;
+			world|@world) true ;;
+			# unknown commands
+			*)
+					HELP=1
+					echo "error: invalid argument: $ARG" >&2
+				;;
+		esac
+done
+
+# determine operating mode:
+if [ "$HELP" != "0" ]; then
+	show_help
+	exit 1
+else
+	pacsync_update_world
+fi
