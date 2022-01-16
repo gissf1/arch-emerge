@@ -136,6 +136,8 @@ rebuild_world_set() {
 	local CHILDREN
 	echo ">>> checking for dependencies..."
 	[ -f "$SETFILE.checkdeps.groups" ] && rm "$SETFILE.checkdeps.groups"
+	local PKGIDX=0
+	local RAWLINES=$( wc -l < "$SETFILE.raw" )
 	for PKG in $( cat "$SETFILE.raw" ) ; do
 		$PACMAN -Qi "$PKG" > /tmp/emerge_pacman_Qi
 		PGROUPS=$( egrep '^Groups *: ' < /tmp/emerge_pacman_Qi | cut -d: -f2 | sed -r 's/^ +//g ; s/ +$//g' )
@@ -159,6 +161,10 @@ rebuild_world_set() {
 					echo "$GROUP" >> "$SETFILE.checkdeps.groups"
 				fi
 			done
+		fi
+		if [ -t 0 ]; then
+			(( ++PKGIDX ))
+			printf "Package %i/%i...\r" $PKGIDX $RAWLINES
 		fi
 	done
 	[ -f /tmp/emerge_pacman_Qi ] && rm /tmp/emerge_pacman_Qi
