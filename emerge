@@ -102,6 +102,29 @@ orphans=$( $PACMAN -Qqtd | filter_exclude_optdepended )
 
 rebuild_world_set() {
 	local SETFILE="$EMERGE_CONF/world.set"
+	if [ -e "$SETFILE" ]; then
+		local SUFFIX=".backup-"
+		local DATE=$(date +%Y-%m-%d)
+		local TIME="_$(date +%H%M)"
+		local SEC="$(date +%S)"
+		local TFN=""
+		# determine backup filename
+		if [ ! -e "$SETFILE$SUFFIX$DATE" ]; then
+			TFN="$SETFILE$SUFFIX$DATE"
+		elif [ ! -e "$SETFILE$SUFFIX$DATE$TIME" ]; then
+			TFN="$SETFILE$SUFFIX$DATE$TIME"
+		elif [ ! -e "$SETFILE$SUFFIX$DATE$TIME$SEC" ]; then
+			TFN="$SETFILE$SUFFIX$DATE$TIME$SEC"
+		else
+			local PREFIX="${SETFILE}${SUFFIX}${DATE}${TIME}${SEC}_"
+			TFN="$PREFIX$SECONDS$RANDOM"
+			while [ ! -e "$TFN" ]; do
+				TFN="$PREFIX$SECONDS$RANDOM"
+			done
+		fi
+		echo ">>> backing up existing world.set file as $TFN"
+		mv "$SETFILE" "$TFN" || exit $?
+	fi
 	echo ">>> generating world.set from current system pacman config..."
 	$PACMAN -Qqe > "$SETFILE.raw"
 	# optimize world.set
@@ -149,7 +172,7 @@ rebuild_world_set() {
 			echo -n "replacing @$GROUP children in world.set: "
 			for PKG in $CHILDREN ; do
 				echo -n "$PKG "
-				egrep -v "^$PKG\$" "$SETFILE.raw" > "$SETFILE.tmp" && mv "$SETFILE.tmp" "$SETFILE.raw"
+				fgrep -xv "$PKG" "$SETFILE.raw" > "$SETFILE.tmp" && mv "$SETFILE.tmp" "$SETFILE.raw"
 			done
 			echo "@$GROUP" >> "$SETFILE.raw"
 			echo ""
