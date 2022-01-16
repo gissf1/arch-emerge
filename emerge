@@ -298,7 +298,9 @@ parseArgs() {
 	# argument parsing for common emerge flags
 	while [[ $# -gt 0 ]]; do
 		ARG="$1"
+		NEXTARG=""
 		shift
+		while [ -n "$ARG" ]; do
 			case "$ARG" in
 				# our own additions
 				-h|--help) HELP=1 ;;
@@ -333,6 +335,21 @@ parseArgs() {
 					;;
 				world|@world) true ;;
 				# unknown commands
+				-*)
+					if [[ $ARG =~ ^-[0-9A-Za-z][0-9A-Za-z] ]]; then
+						if [ -z "$NEXTARG" ]; then
+							NEXTARG="-${ARG:2}"
+							ARG="${ARG:0:2}"
+						else
+							NEXTARG="-${ARG:2} $NEXTARG"
+							ARG="${ARG:0:2}"
+						fi
+						continue
+					else
+						HELP=1
+						echo "error: invalid argument: $ARG" >&2
+					fi
+					;;
 				*)
 					if [[ $ARG =~ ^[A-Za-z] ]]; then
 						if [ -n "$PKGS" ]; then
@@ -345,6 +362,9 @@ parseArgs() {
 					fi
 					;;
 			esac
+			ARG="$NEXTARG"
+			NEXTARG=""
+		done
 	done
 }
 
