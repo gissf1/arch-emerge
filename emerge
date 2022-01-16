@@ -287,6 +287,7 @@ standalone options:
 					searches package database names and info for search_terms
 general options:
        -a --ask         ask for user confirmation before proceeding
+       -u --update      update specified packages (or world if none)
        -e --emptytree   nothing; accepted for compatibility
        -N --newuse      nothing; accepted for compatibility
        -D --deep        nothing; accepted for compatibility
@@ -320,6 +321,7 @@ parseArgs() {
 						ASK=1
 					fi
 					;;
+				-u|--update) UPDATE=1 ;;
 				# ignored arguments
 				-e|--emptytree) true ;;
 				-N|--newuse) true ;;
@@ -374,6 +376,7 @@ SYNC=0
 SEARCH=0
 PKGS=""
 ASK=0
+UPDATE=0
 HELP=0
 if [ "$EMERGE_DEFAULT_OPTS" != "" ]; then
 	parseArgs $EMERGE_DEFAULT_OPTS
@@ -383,6 +386,14 @@ parseArgs $@
 # map emerge flags to pacman flags
 PACMAN_S_OPTS=""
 PACMAN_R_OPTS=""
+if [ $SYNC == 1 ] ; then
+	PACMAN_S_OPTS="${PACMAN_S_OPTS}y"
+fi
+
+if [ $UPDATE == 1 ] ; then
+	PACMAN_S_OPTS="${PACMAN_S_OPTS}u"
+fi
+
 if [ $ASK == 0 ] ; then
 	PACMAN_S_OPTS="${PACMAN_S_OPTS} --noconfirm"
 	PACMAN_R_OPTS="${PACMAN_R_OPTS} --noconfirm"
@@ -400,9 +411,12 @@ elif [ $SEARCH != 0 -a -n "$PKGS" ]; then
 	$PACMAN -Ss $PKGS
 elif [ $REBUILD_WORLD_SET == 1 ]; then
 	rebuild_world_set
+elif [ $UPDATE == 1 ]; then
+		pacman_update_world
 elif [ $SYNC == 1 ] ; then
 	echo ">>> sync-database-only mode..."
 	$PACMAN -Syy
 else
-	pacman_update_world
+	show_help
+	exit 1
 fi
