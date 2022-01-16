@@ -34,6 +34,10 @@ filter_exclude_optdepended() {
 	xargs -r $PACMAN -Qi | awk '/^Name/{name=$3} /^Optional For\s*:\s*\S/{ if ( $4 == "None" ) { print name } }'
 }
 
+filter_only_explicit() {
+	xargs -r $PACMAN -Qi | awk '/^Name/{name=$3} /^Install Reason.*Explicitly installed$/{ print name }'
+}
+
 import_set() {
 	local includecmd="$EMERGE_CONF/$1.set"
 	local maskcmd="$EMERGE_CONF/$1.mask"
@@ -217,6 +221,11 @@ rebuild_world_set() {
 	for GROUP in $( cat "$SETFILE.checkdeps.groups" ) ; do
 		CHILDREN=$( $PACMAN -Sg "$GROUP" | sed "s/^$GROUP //g" )
 		if [ -n "$CHILDREN" ] && $PACMAN -T $CHILDREN >/dev/null ; then
+			# only replace if at least 1 child is explicitly installed
+			local EXPLICIT_CHILDREN=$( filter_only_explicit <<<"$CHILDREN" )
+			if [ -z "$EXPLICIT_CHILDREN" ]; then
+				continue
+			fi
 			echo -n "replacing @$GROUP children in world.set: "
 			for PKG in $CHILDREN ; do
 				echo -n "$PKG "
