@@ -113,12 +113,12 @@ if [ -n "$explicit_add" ]; then
 	done
 fi
 if [ -n "$toinstall" ]; then
-	$PACMAN -Su --noconfirm $toinstall || exit 1
+	$PACMAN -Su$PACMAN_S_OPTS $toinstall || exit 1
 else
-	$PACMAN -Su --noconfirm
+	$PACMAN -Su$PACMAN_S_OPTS
 fi
 orphans=$( $PACMAN -Qqtd | filter_exclude_optdepended )
-[ -z "$orphans" ] || $PACMAN -Rs --noconfirm $orphans || exit 1
+[ -z "$orphans" ] || $PACMAN -Rs$PACMAN_R_OPTS $orphans || exit 1
 }
 
 rebuild_world_set() {
@@ -285,6 +285,8 @@ standalone options:
        --sync                fetch latest package database updates
        -s --search -S --searchdesc  SEARCH_TERM
 					searches package database names and info for search_terms
+general options:
+       -a --ask         ask for user confirmation before proceeding
 "
 }
 
@@ -293,6 +295,7 @@ REBUILD_WORLD_SET=0
 SYNC=0
 SEARCH=0
 PKGS=""
+ASK=0
 HELP=0
 while [[ $# -gt 0 ]]; do
 	ARG="$1"
@@ -304,6 +307,18 @@ while [[ $# -gt 0 ]]; do
 			# emerge compatibility flags
 			--sync) SYNC=1 ;;
 			-s|--search|-S|--searchdesc) SEARCH=1 ;;
+			-a|--ask)
+				if [[ $1 =~ ^[YNyn]$ ]] ; then
+					if [[ "$1" =~ ^[Yy]$ ]]; then
+						ASK=1
+					else
+						ASK=0
+					fi
+					shift
+				else
+					ASK=1
+				fi
+				;;
 			world|@world) true ;;
 			# unknown commands
 			*)
@@ -319,6 +334,17 @@ while [[ $# -gt 0 ]]; do
 				;;
 		esac
 done
+
+# map emerge flags to pacman flags
+PACMAN_S_OPTS=""
+PACMAN_R_OPTS=""
+if [ $ASK == 0 ] ; then
+	PACMAN_S_OPTS="${PACMAN_S_OPTS} --noconfirm"
+	PACMAN_R_OPTS="${PACMAN_R_OPTS} --noconfirm"
+else
+	PACMAN_S_OPTS="${PACMAN_S_OPTS} --confirm"
+	PACMAN_R_OPTS="${PACMAN_R_OPTS} --confirm"
+fi
 
 # determine operating mode:
 if [ "$HELP" != "0" ]; then
