@@ -101,8 +101,9 @@ orphans=$( $PACMAN -Qqtd | filter_exclude_optdepended )
 }
 
 rebuild_world_set() {
+	local SETFILE="$EMERGE_CONF/world.set"
 	echo ">>> generating world.set from current system pacman config..."
-	$PACMAN -Qqe > "$EMERGE_CONF/world.set"
+	$PACMAN -Qqe > "$SETFILE"
 }
 
 ensure_world_set_exists() {
