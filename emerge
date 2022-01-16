@@ -121,19 +121,23 @@ pacman_update_world() {
 show_help() {
 	cat <<<"
 usage: $( basename "$0" ) {-h|--help}
+       $( basename "$0" ) {--rebuild-world-set}
        $( basename "$0" ) [options] {world|@world}
 standalone options:
        -h --help             show this help text
+       --rebuild-world-set   generate new world.set from pacman database
 "
 }
 
 # command line argument parsing for common emerge flags
+REBUILD_WORLD_SET=0
 HELP=0
 while [[ $# -gt 0 ]]; do
 	ARG="$1"
 	shift
 		case "$ARG" in
 			-h|--help) HELP=1 ;;
+			--rebuild-world-set) REBUILD_WORLD_SET=1 ;;
 			world|@world) true ;;
 			# unknown commands
 			*)
@@ -147,6 +151,8 @@ done
 if [ "$HELP" != "0" ]; then
 	show_help
 	exit 1
+elif [ $REBUILD_WORLD_SET == 1 ]; then
+	rebuild_world_set
 else
 	pacman_update_world
 fi
