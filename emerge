@@ -259,23 +259,28 @@ pacman_update_world() {
 show_help() {
 	cat <<<"
 usage: $( basename "$0" ) {-h|--help}
-       $( basename "$0" ) {--rebuild-world-set}
+       $( basename "$0" ) {--rebuild-world-set|--sync}
        $( basename "$0" ) [options] {world|@world}
 standalone options:
        -h --help             show this help text
        --rebuild-world-set   generate new world.set from pacman database
+       --sync                fetch latest package database updates
 "
 }
 
 # command line argument parsing for common emerge flags
 REBUILD_WORLD_SET=0
+SYNC=0
 HELP=0
 while [[ $# -gt 0 ]]; do
 	ARG="$1"
 	shift
 		case "$ARG" in
+			# our own additions
 			-h|--help) HELP=1 ;;
 			--rebuild-world-set) REBUILD_WORLD_SET=1 ;;
+			# emerge compatibility flags
+			--sync) SYNC=1 ;;
 			world|@world) true ;;
 			# unknown commands
 			*)
@@ -291,6 +296,9 @@ if [ "$HELP" != "0" ]; then
 	exit 1
 elif [ $REBUILD_WORLD_SET == 1 ]; then
 	rebuild_world_set
+elif [ $SYNC == 1 ] ; then
+	echo ">>> sync-database-only mode..."
+	$PACMAN -Syy
 else
 	pacman_update_world
 fi
