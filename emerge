@@ -30,12 +30,29 @@ filter_conf() {
 	done
 }
 
+filter_exclude_depended() {
+	xargs -r $PACMAN -Qi | awk '/^Name/{name=$3} /^Required By\s*:\s*\S/{ if ( $4 == "None" ) { print name } }'
+}
+
 filter_exclude_optdepended() {
 	xargs -r $PACMAN -Qi | awk '/^Name/{name=$3} /^Optional For\s*:\s*\S/{ if ( $4 == "None" ) { print name } }'
 }
 
 filter_only_explicit() {
 	xargs -r $PACMAN -Qi | awk '/^Name/{name=$3} /^Install Reason.*Explicitly installed$/{ print name }'
+}
+
+filter_conf_minimize_groups() {
+	local line
+	while read line; do
+		if [ -n "$(echo $line|grep '^<')" ]; then
+			import_set $(echo $line|sed 's/^<//')
+		elif [ -n "$(echo $line|grep '^@')" ]; then
+			$PACMAN -Sqg $(echo $line|sed 's/^@//') | filter_exclude_depended
+		else
+			echo $line
+		fi
+	done
 }
 
 import_set() {
@@ -49,7 +66,7 @@ import_set() {
 	[ -x "$includecmd" ] || includecmd="cat $includecmd"
 	[ -x "$maskcmd" ] || maskcmd="cat $maskcmd"
 
-	local include=$($includecmd|filter_conf)
+	local include=$($includecmd|filter_conf_minimize_groups)
 	local mask=$($maskcmd|filter_conf)
 	for pkg in $include; do
 		if list_doesnot_contain $pkg $mask ; then
