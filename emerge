@@ -277,17 +277,22 @@ show_help() {
 	cat <<<"
 usage: $( basename "$0" ) {-h|--help}
        $( basename "$0" ) {--rebuild-world-set|--sync}
+       $( basename "$0" ) {-s|--search|-S|--searchdesc} SEARCH_TERM
        $( basename "$0" ) [options] {world|@world}
 standalone options:
        -h --help             show this help text
        --rebuild-world-set   generate new world.set from pacman database
        --sync                fetch latest package database updates
+       -s --search -S --searchdesc  SEARCH_TERM
+					searches package database names and info for search_terms
 "
 }
 
 # command line argument parsing for common emerge flags
 REBUILD_WORLD_SET=0
 SYNC=0
+SEARCH=0
+PKGS=""
 HELP=0
 while [[ $# -gt 0 ]]; do
 	ARG="$1"
@@ -298,11 +303,19 @@ while [[ $# -gt 0 ]]; do
 			--rebuild-world-set) REBUILD_WORLD_SET=1 ;;
 			# emerge compatibility flags
 			--sync) SYNC=1 ;;
+			-s|--search|-S|--searchdesc) SEARCH=1 ;;
 			world|@world) true ;;
 			# unknown commands
 			*)
+				if [[ $ARG =~ ^[A-Za-z] ]]; then
+					if [ -n "$PKGS" ]; then
+						PKGS="$PKGS "
+					fi
+					PKGS="$PKGS$ARG"
+				else
 					HELP=1
 					echo "error: invalid argument: $ARG" >&2
+				fi
 				;;
 		esac
 done
@@ -311,6 +324,9 @@ done
 if [ "$HELP" != "0" ]; then
 	show_help
 	exit 1
+elif [ $SEARCH != 0 -a -n "$PKGS" ]; then
+	echo ">>> search mode: $PKGS"
+	$PACMAN -Ss $PKGS
 elif [ $REBUILD_WORLD_SET == 1 ]; then
 	rebuild_world_set
 elif [ $SYNC == 1 ] ; then
