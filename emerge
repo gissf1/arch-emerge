@@ -298,7 +298,36 @@ ensure_world_set_exists() {
 	fi
 }
 
+pacman_install() {
+	echo ">>> Mode: install $PKGS"
+	ensure_world_set_exists
+	emerge_preview "$PKGS" ""
+	$PACMAN -S$PACMAN_S_OPTS $PKGS
+	local RET=$?
+	if [ $RET != 0 ]; then
+		echo ">>> failed to install: $PKGS"
+	else
+		local PKG
+		local CLEANUP=0
+		for PKG in $PKGS ; do
+			if $PACMAN -T "$PKG" >/dev/null ; then
+				echo ">>> adding to world.set: $PKG"
+				echo "$PKG" >> "$EMERGE_CONF/world.set"
+				CLEANUP=1
+			else
+				echo ">>> failed to install: $PKG"
+			fi
+		done
+		if [ $CLEANUP == 1 ]; then
+			sort -u "$EMERGE_CONF/world.set" > "$EMERGE_CONF/world.set.tmp" && mv "$EMERGE_CONF/world.set.tmp" "$EMERGE_CONF/world.set"
+			RET=$?
+		fi
+	fi
+	exit $RET
+}
+
 pacman_update_world() {
+	echo ">>> Mode: update @world"
 	ensure_world_set_exists
 	pacsync_update_world
 }
@@ -309,6 +338,7 @@ usage: $( basename "$0" ) {-h|--help}
        $( basename "$0" ) {--rebuild-world-set|--sync}
        $( basename "$0" ) {-s|--search|-S|--searchdesc} SEARCH_TERM
        $( basename "$0" ) [options] {world|@world}
+       $( basename "$0" ) [options] [package1...]
 standalone options:
        -h --help             show this help text
        --rebuild-world-set   generate new world.set from pacman database
@@ -442,7 +472,13 @@ elif [ $SEARCH != 0 -a -n "$PKGS" ]; then
 elif [ $REBUILD_WORLD_SET == 1 ]; then
 	rebuild_world_set
 elif [ $UPDATE == 1 ]; then
+	if [ -n "$PKGS" ]; then
+		pacman_install
+	else
 		pacman_update_world
+	fi
+elif [ -n "$PKGS" ]; then
+	pacman_install
 elif [ $SYNC == 1 ] ; then
 	echo ">>> sync-database-only mode..."
 	$PACMAN -Syy
