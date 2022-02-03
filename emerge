@@ -326,8 +326,36 @@ pacman_install() {
 	exit $RET
 }
 
+pacman_depclean() {
+	echo ">>> Mode: depclean $PKGS"
+	ensure_world_set_exists
+	emerge_preview "" "$PKGS"
+	$PACMAN -Rs$PACMAN_R_OPTS $PKGS
+	local RET=$?
+	if [ $RET != 0 ]; then
+		echo ">>> failed to depclean: $PKGS"
+	else
+		local PKG
+		for PKG in $PKGS ; do
+			if $PACMAN -T "$PKG" >/dev/null ; then
+				echo ">>> failed to depclean: $PKG"
+			else
+				echo ">>> removing from world.set: $PKG"
+				fgrep -xv "$PKG" "$EMERGE_CONF/world.set" > "$EMERGE_CONF/world.set.tmp" && mv "$EMERGE_CONF/world.set.tmp" "$EMERGE_CONF/world.set"
+			fi
+		done
+	fi
+	exit $RET
+}
+
 pacman_update_world() {
 	echo ">>> Mode: update @world"
+	ensure_world_set_exists
+	pacsync_update_world
+}
+
+pacman_depclean_world() {
+	echo ">>> Mode: depclean @world"
 	ensure_world_set_exists
 	pacsync_update_world
 }
@@ -347,6 +375,7 @@ standalone options:
 					searches package database names and info for search_terms
 general options:
        -a --ask         ask for user confirmation before proceeding
+       -c --depclean    remove specified packages (or those not in world)
        -u --update      update specified packages (or world if none)
        -e --emptytree   nothing; accepted for compatibility
        -N --newuse      nothing; accepted for compatibility
@@ -381,6 +410,7 @@ parseArgs() {
 						ASK=1
 					fi
 					;;
+				-c|--depclean) DEPCLEAN=1 ;;
 				-u|--update) UPDATE=1 ;;
 				# ignored arguments
 				-e|--emptytree) true ;;
@@ -436,6 +466,7 @@ SYNC=0
 SEARCH=0
 PKGS=""
 ASK=0
+DEPCLEAN=0
 UPDATE=0
 HELP=0
 if [ "$EMERGE_DEFAULT_OPTS" != "" ]; then
@@ -471,6 +502,12 @@ elif [ $SEARCH != 0 -a -n "$PKGS" ]; then
 	$PACMAN -Ss $PKGS
 elif [ $REBUILD_WORLD_SET == 1 ]; then
 	rebuild_world_set
+elif [ $DEPCLEAN == 1 ]; then
+	if [ -n "$PKGS" ]; then
+		pacman_depclean
+	else
+		pacman_depclean_world
+	fi
 elif [ $UPDATE == 1 ]; then
 	if [ -n "$PKGS" ]; then
 		pacman_install
