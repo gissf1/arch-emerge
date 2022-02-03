@@ -84,22 +84,52 @@ extras() {
 	done
 }
 
+emerge_preview() {
+	# show output similar to emerge preview
+	# $1 - ADDS - packages to add due to world.set changes
+	# $2 - DELS - packages to remove due to world.set changes
+	local ADDS="$1"
+	local DELS="$2"
+	local PKG
+	echo "These are the packages that would be merged:"
+	for PKG in $ADDS; do
+		if $PACMAN -T "$PKG" >/dev/null ; then
+			echo "[emerge  R     ] $PKG"
+		else
+			echo "[emerge  N     ] $PKG"
+		fi
+	done
+	for PKG in $DELS; do
+		if $PACMAN -T "$PKG" >/dev/null ; then
+			echo "[emerge Remove ] $PKG"
+		else
+			echo "[emerge Removed] $PKG"
+		fi
+	done
+	if [ $ASK == 1 ]; then
+		local REPLY="*"
+		while [[ ! $REPLY =~ ^[YNyn]?$ ]]; do
+			echo -n "Continue [Y/n]? "
+			read REPLY
+		done
+		if [ "$REPLY" == "" ]; then
+			REPLY="Y"
+		elif [[ $REPLY =~ ^[yn]$ ]]; then
+			REPLY=$( tr 'yn' 'YN' <<<"$REPLY" )
+		fi
+		if [ "$REPLY" != "Y" ]; then
+			exit 0
+		fi
+	fi
+}
+
 pacsync_update_world() {
 	explicit=$(import_set world)
 
 	explicit_rm=$($PACMAN -Qqe|extras $explicit)
 	explicit_add=$(echo $explicit|extras $($PACMAN -Qqe))
 
-	cat  <<!
-	The following packages will be added to the explict set:
-	$explicit_add
-
-	The following packages will be removed from the explicit set:
-	$explicit_rm
-
-	press enter to continue, or Ctrl-C to stop.
-!
-	read
+	emerge_preview "$explicit_add" "$explicit_rm"
 
 	toinstall=""
 	[ -z "$explicit_rm" ] || $PACMAN -D --asdeps $explicit_rm || exit 1
