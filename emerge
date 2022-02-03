@@ -377,6 +377,7 @@ general options:
        -1 --oneshot     install packages as non-explicit
        -a --ask         ask for user confirmation before proceeding
        -c --depclean    remove specified packages (or those not in world)
+       -f --fetchonly   only download package files, don't install
        -p --pretend     only show what would be done
        -u --update      update specified packages (or world if none)
        -e --emptytree   nothing; accepted for compatibility
@@ -414,6 +415,7 @@ parseArgs() {
 					fi
 					;;
 				-c|--depclean) DEPCLEAN=1 ;;
+				-f|--fetchonly) FETCHONLY=1 ;;
 				-p|--pretend) PRETEND=1 ;;
 				-u|--update) UPDATE=1 ;;
 				# ignored arguments
@@ -472,6 +474,7 @@ PKGS=""
 ONESHOT=0
 ASK=0
 DEPCLEAN=0
+FETCHONLY=0
 PRETEND=0
 UPDATE=0
 HELP=0
@@ -485,6 +488,10 @@ PACMAN_S_OPTS=""
 PACMAN_R_OPTS=""
 if [ $SYNC == 1 ] ; then
 	PACMAN_S_OPTS="${PACMAN_S_OPTS}y"
+fi
+
+if [ $FETCHONLY == 1 ] ; then
+	PACMAN_S_OPTS="${PACMAN_S_OPTS}w"
 fi
 
 if [ $UPDATE == 1 ] ; then
