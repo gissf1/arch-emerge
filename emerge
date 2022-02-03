@@ -306,7 +306,7 @@ pacman_install() {
 	local RET=$?
 	if [ $RET != 0 ]; then
 		echo ">>> failed to install: $PKGS"
-	else
+	elif [ "$ONESHOT" == "0" ]; then
 		local PKG
 		local CLEANUP=0
 		for PKG in $PKGS ; do
@@ -334,7 +334,7 @@ pacman_depclean() {
 	local RET=$?
 	if [ $RET != 0 ]; then
 		echo ">>> failed to depclean: $PKGS"
-	else
+	elif [ "$ONESHOT" == "0" ]; then
 		local PKG
 		for PKG in $PKGS ; do
 			if $PACMAN -T "$PKG" >/dev/null ; then
@@ -374,6 +374,7 @@ standalone options:
        -s --search -S --searchdesc  SEARCH_TERM
 					searches package database names and info for search_terms
 general options:
+       -1 --oneshot     install packages as non-explicit
        -a --ask         ask for user confirmation before proceeding
        -c --depclean    remove specified packages (or those not in world)
        -u --update      update specified packages (or world if none)
@@ -398,6 +399,7 @@ parseArgs() {
 				# emerge compatibility flags
 				--sync) SYNC=1 ;;
 				-s|--search|-S|--searchdesc) SEARCH=1 ;;
+				-1|--oneshot) ONESHOT=1 ;;
 				-a|--ask)
 					if [[ $1 =~ ^[YNyn]$ ]] ; then
 						if [[ "$1" =~ ^[Yy]$ ]]; then
@@ -465,6 +467,7 @@ REBUILD_WORLD_SET=0
 SYNC=0
 SEARCH=0
 PKGS=""
+ONESHOT=0
 ASK=0
 DEPCLEAN=0
 UPDATE=0
@@ -491,6 +494,10 @@ if [ $ASK == 0 ] ; then
 else
 	PACMAN_S_OPTS="${PACMAN_S_OPTS} --confirm"
 	PACMAN_R_OPTS="${PACMAN_R_OPTS} --confirm"
+fi
+
+if [ $ONESHOT == 1 ] ; then
+	PACMAN_S_OPTS="${PACMAN_S_OPTS} --asdeps"
 fi
 
 # determine operating mode:
