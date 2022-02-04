@@ -290,50 +290,55 @@ general options:
 "
 }
 
-# command line argument parsing for common emerge flags
+parseArgs() {
+	# argument parsing for common emerge flags
+	while [[ $# -gt 0 ]]; do
+		ARG="$1"
+		shift
+			case "$ARG" in
+				# our own additions
+				-h|--help) HELP=1 ;;
+				--rebuild-world-set) REBUILD_WORLD_SET=1 ;;
+				# emerge compatibility flags
+				--sync) SYNC=1 ;;
+				-s|--search|-S|--searchdesc) SEARCH=1 ;;
+				-a|--ask)
+					if [[ $1 =~ ^[YNyn]$ ]] ; then
+						if [[ "$1" =~ ^[Yy]$ ]]; then
+							ASK=1
+						else
+							ASK=0
+						fi
+						shift
+					else
+						ASK=1
+					fi
+					;;
+				world|@world) true ;;
+				# unknown commands
+				*)
+					if [[ $ARG =~ ^[A-Za-z] ]]; then
+						if [ -n "$PKGS" ]; then
+							PKGS="$PKGS "
+						fi
+						PKGS="$PKGS$ARG"
+					else
+						HELP=1
+						echo "error: invalid argument: $ARG" >&2
+					fi
+					;;
+			esac
+	done
+}
+
+# defaults for common emerge flags
 REBUILD_WORLD_SET=0
 SYNC=0
 SEARCH=0
 PKGS=""
 ASK=0
 HELP=0
-while [[ $# -gt 0 ]]; do
-	ARG="$1"
-	shift
-		case "$ARG" in
-			# our own additions
-			-h|--help) HELP=1 ;;
-			--rebuild-world-set) REBUILD_WORLD_SET=1 ;;
-			# emerge compatibility flags
-			--sync) SYNC=1 ;;
-			-s|--search|-S|--searchdesc) SEARCH=1 ;;
-			-a|--ask)
-				if [[ $1 =~ ^[YNyn]$ ]] ; then
-					if [[ "$1" =~ ^[Yy]$ ]]; then
-						ASK=1
-					else
-						ASK=0
-					fi
-					shift
-				else
-					ASK=1
-				fi
-				;;
-			world|@world) true ;;
-			# unknown commands
-			*)
-				if [[ $ARG =~ ^[A-Za-z] ]]; then
-					if [ -n "$PKGS" ]; then
-						PKGS="$PKGS "
-					fi
-					PKGS="$PKGS$ARG"
-				else
-					HELP=1
-					echo "error: invalid argument: $ARG" >&2
-				fi
-				;;
-		esac
-done
+parseArgs $@
 
 # map emerge flags to pacman flags
 PACMAN_S_OPTS=""
