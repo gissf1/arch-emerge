@@ -338,6 +338,9 @@ SEARCH=0
 PKGS=""
 ASK=0
 HELP=0
+if [ "$EMERGE_DEFAULT_OPTS" != "" ]; then
+	parseArgs $EMERGE_DEFAULT_OPTS
+fi
 parseArgs $@
 
 # map emerge flags to pacman flags
