@@ -1,19 +1,42 @@
-.TH pacsync  8 "November 25, 2010" "version 0.1" "PACSYNC MANUAL"
+.TH emerge  8 "January 13, 2022" "version 0.1" "EMERGE MANUAL"
 .SH NAME
-pacsync -\ bring package database in sync with a configuration set
+emerge -\ bring package database in sync with a configuration set
 .SH SYNOPSIS
-.B pacsync
+.B emerge [options]
 .SH DESCPRIPTION
 
-Pacsync is a frontend for pacman which rather than taking commands such as
-"install foo" or "remove bar" looks at a set of configuration files to
+Emerge is a frontend for pacman which, rather than taking commands such as
+"install foo" or "remove bar", looks at a set of configuration files to
 determine what should be on the system, then brings system in sync with that
 view.
 
+This mirrors the concept used by Gentoo's emerge package management tool.
+As such, the command line arguments have been redesigned to approximate Gentoo's
+emerge syntax as well.
+
+As this is a secondary package management tool on top of an existing package
+management system, the ability to import an existing system package
+configuration has been added for ease of migration into this paradigm.  This
+is done when an existing EMERGE_CONF/world.set is not present (such as during
+the initial run), or when emerge is passed the
+.B --rebuild-world-set
+argument.  If an existing world.set file is present, it is safely backed up
+before any rebuild begins.
+
+See the
+.B -h
+or
+.B --help
+output for other options.
+
+Since this tool is meant to mimic Gentoo's emerge options, you can also look
+at the usage and description of that tool and its options, as the options
+that have been reimplemented here should be quite similar in function.
+
 .SH CONFIGURATION
 
-Configuration files for pacsync belong in the directory contained in
-$PACSYNC_CONF, or /etc/pacsync if it is not defined. The configuration defines
+Configuration files for emerge belong in the directory contained in
+$EMERGE_CONF, or /etc/emerge if it is not defined. The configuration defines
 sets of packages. Each set comes in the form of a pair of files, <setname>.set
 and <setname>.mask, where <setname> is the name of the set. The .set file
 specifies a list of packages, groups, and other sets that should be included
@@ -25,12 +48,12 @@ remainder specifies a set name, if it begins with a '@' its remainder
 specifies a group name, and otherwise the line specifies a package.
 
 The special set 'world' determines the set of packages that should be
-explicitly installed on the system. When pacsync is run, it will ensure that
+explicitly installed on the system. When emerge is run, it will ensure that
 all packages in world are explicitly installed, no other packages are
 installed explicitly, and only packages in world and their dependencies (both
 direct and indirect) are installed.
 
-If the user running pacsync (typically root) has execute permissions on a .set
+If the user running emerge (typically root) has execute permissions on a .set
 or .mask file, then instead of reading from the file, the file will be executed
 and it's output will be used.
 
@@ -93,10 +116,12 @@ Then, individual sets for each host can be created. They may include common sets
 
 .SH ENVIRONMENT VARIABLES
 
-PACSYNC_CONF - location in which to look for configuration sets.
+EMERGE_CONF - location in which to look for configuration sets.
 
-.SH AUTHOR
-Ian Denhardt <ian@zenhack.net>
+.SH AUTHORS
+Brian Gisseler <gissf1@gmail.com> (arch-emerge author)
+.br
+Ian Denhardt <ian@zenhack.net> (original pacsync author)
 
 .SH BUGS
 None hopefully. Contact the author if you find evidence to the contrary.
