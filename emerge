@@ -295,12 +295,13 @@ ensure_world_set_exists() {
 	if [ ! -e "$EMERGE_CONF/world.set" ]; then
 		echo ">>> world set file '$EMERGE_CONF/world.set' does not exist."
 		rebuild_world_set
+		return $?
 	fi
 }
 
 pacman_install() {
 	echo ">>> Mode: install $PKGS"
-	ensure_world_set_exists
+	ensure_world_set_exists || exit $?
 	emerge_preview "$PKGS" ""
 	$PACMAN -S$PACMAN_S_OPTS $PKGS
 	local RET=$?
@@ -328,7 +329,7 @@ pacman_install() {
 
 pacman_depclean() {
 	echo ">>> Mode: depclean $PKGS"
-	ensure_world_set_exists
+	ensure_world_set_exists || exit $?
 	emerge_preview "" "$PKGS"
 	$PACMAN -Rs$PACMAN_R_OPTS $PKGS
 	local RET=$?
@@ -350,13 +351,13 @@ pacman_depclean() {
 
 pacman_update_world() {
 	echo ">>> Mode: update @world"
-	ensure_world_set_exists
+	ensure_world_set_exists || exit $?
 	pacsync_update_world
 }
 
 pacman_depclean_world() {
 	echo ">>> Mode: depclean @world"
-	ensure_world_set_exists
+	ensure_world_set_exists || exit $?
 	pacsync_update_world
 }
 
