@@ -2,10 +2,14 @@
 
 EMERGE_CONF=${EMERGE_CONF:-/etc/emerge}
 
+TMPDIR='/tmp'
 PACMAN='pacman'
+SUDO='sudo'
 if [ -e "$EMERGE_CONF/emerge.conf" ]; then
 	. "$EMERGE_CONF/emerge.conf"
 fi
+SUDO_HELPER_PREFIX="$TMPDIR/$( basename "$0" ).$$"
+SUDO_HELPER_PID=""
 
 list_doesnot_contain() {
 	local target="$1"
@@ -153,6 +157,11 @@ pacsync_update_world() {
 
 rebuild_world_set() {
 	local SETFILE="$EMERGE_CONF/world.set"
+	ensure_world_set_is_writable || exit $?
+	if [ "$SUDO_HELPER_PID" != "" ]; then
+		manipulate_world_set "$0" --rebuild-world-set
+		return $?
+	fi
 	if [ -e "$SETFILE" ]; then
 		local SUFFIX=".backup-"
 		local DATE=$(date +%Y-%m-%d)
@@ -299,10 +308,184 @@ ensure_world_set_exists() {
 	fi
 }
 
+sudo_process() {
+	if [ $SPAWN_SUDO_PROCESS -le 1 -o ! -e "/proc/$SPAWN_SUDO_PROCESS/" ]; then
+		echo "sudo_process: invalid pid: $SPAWN_SUDO_PROCESS" >&2
+		return 1
+	fi
+	export SUDO_HELPER_PREFIX="$TMPDIR/$( basename "$0" ).$SPAWN_SUDO_PROCESS"
+	local CMDIN="$SUDO_HELPER_PREFIX/in"
+	local CMDOUT="$SUDO_HELPER_PREFIX/out"
+	if [ ! -r "$CMDIN" ]; then
+		echo "sudo_process: unable to read: $CMDIN" >&2
+		return 1
+	fi
+	if [ ! -w "$CMDOUT" ]; then
+		echo "sudo_process: unable to write: $CMDOUT" >&2
+		return 1
+	fi
+	#echo "sudo_process: attempting to remap stdin/out..." >&2
+	exec 0< "$CMDIN" || echo "sudo_process: stdin mapping failed: $?" >&2
+	exec 1> "$CMDOUT" || echo "sudo_process: stdout mapping failed: $?" >&2
+	read -rt 3 LINE || return $?
+	#echo "sudo_process: PPID LINE: $LINE" >&2
+	if [ "$LINE" != "$SPAWN_SUDO_PROCESS" ]; then
+		echo "sudo_process: FATAL: header mismatch: $LINE != $SPAWN_SUDO_PROCESS" >&2
+		return 1
+	fi
+	echo "$$"
+	read -r LINE
+	while [ -n "$LINE" -o -e "/proc/$SPAWN_SUDO_PROCESS/" ] ; do
+		#echo "sudo_process: LINE: $LINE" >&2
+		BOUNDARY="### $SPAWN_SUDO_PROCESS $$ $RANDOM$RANDOM$RANDOM ###"
+		case "$LINE" in
+			exit) break ;;
+			*)
+				echo "$BOUNDARY"
+				sh -c "$LINE"
+				local RET=$?
+				echo "$BOUNDARY"
+				echo "$RET"
+				;;
+		esac
+		read -r LINE
+	done
+}
+
+spawn_sudo_process() {
+	if [ -e "$SUDO_HELPER_PREFIX" ]; then
+		echo ">>> FATAL: unable to spawn sudo process: already exists" >&2
+		return 1
+	elif ! mkdir "$SUDO_HELPER_PREFIX" ; then
+		echo ">>> FATAL: unable to spawn sudo process: unable to lock" >&2
+		return 1
+	fi
+	local CMDIN="$SUDO_HELPER_PREFIX/in"
+	local CMDOUT="$SUDO_HELPER_PREFIX/out"
+	mknod "$CMDIN" p && mknod "$CMDOUT" p
+	local RET=$?
+	if [ $RET -ne 0 ]; then
+		echo ">>> FATAL: unable to spawn sudo process: unable to create named pipes" >&2
+		return 1
+	fi
+	# spawn sudo process
+	$SUDO $0 --spawn-sudo-process $$ || return $?
+	# initialization
+	exec 3> "$CMDIN" || echo "spawn_sudo_process: CMDIN mapping failed: $?" >&2
+	exec 4< "$CMDOUT" || echo "spawn_sudo_process: CMDOUT mapping failed: $?" >&2
+	echo "$$" >&3
+	read -ru 4 SUDO_HELPER_PID
+	rm "$CMDIN" "$CMDOUT"
+	if [[ $SUDO_HELPER_PID =~ ^[0-9]+$ ]] ; then
+		export SUDO_HELPER_PID=$SUDO_HELPER_PID
+	else
+		echo "spawn_sudo_process: invalid pid: $SUDO_HELPER_PID" >&2
+		echo "exit" >&3
+		return 1
+	fi
+	local SUDO_UID=$( manipulate_world_set id -u | tr -d "\n" )
+	#echo "SUDO_UID=$SUDO_UID" >&2
+	if [ "$SUDO_UID" != "0" ]; then
+		echo "spawn_sudo_process: invalid resulting uid: $SUDO_UID" >&2
+		return 1
+	fi
+	# return 0 for success
+	return 0
+}
+
+ensure_world_set_is_writable() {
+	# first be sure dir exists
+	if [ ! -d "$EMERGE_CONF/" ]; then
+		echo ">>> missing configuration directory: $EMERGE_CONF"
+		return 1
+	fi
+	local NEED_SUDO=0
+	#local STATUS="DIR_EXISTS"
+	if [ ! -w "$EMERGE_CONF/" ]; then
+		#STATUS="$STATUS, DIR_NOT_WRITABLE"
+		NEED_SUDO=1
+	elif [ -e "$EMERGE_CONF/world.set" ]; then
+		#STATUS="$STATUS, DIR_WRITABLE, FILE_EXISTS"
+		if [ ! -w "$EMERGE_CONF/world.set" ]; then
+			#STATUS="$STATUS, FILE_NOT_WRITABLE"
+			NEED_SUDO=1
+		fi
+	fi
+	#echo ">>> world.set status: $STATUS"
+	if [ "$NEED_SUDO" == "0" ] ; then
+		return 0
+	fi
+	if [ "$SUDO_HELPER_PID" == "" ]; then
+		spawn_sudo_process || return $?
+		echo ">>> spawned new sudo process: $SUDO_HELPER_PID"
+	fi
+	if [ "$SUDO_HELPER_PID" != "" ]; then
+		echo ">>> using spawned sudo process: $SUDO_HELPER_PID"
+		return 0
+	fi
+	if [ ! -w "$EMERGE_CONF/world.set" ]; then
+		echo ">>> world set file '$EMERGE_CONF/world.set' is not writable"
+		return 1
+	fi
+	echo ">>> unable to ensure world set file '$EMERGE_CONF/world.set' is writable: unknown error"
+	return 1
+}
+
+manipulate_world_set() {
+	#echo "manipulate_world_set(): starting..." >&2
+	if [ -w "$EMERGE_CONF/" -o -w "$EMERGE_CONF/world.set" ]; then
+		# execute locally
+		echo "manipulate_world_set(): executing: $*" >&2
+		sh -c "$*"
+		return $?
+	fi
+	if [ "$SUDO_HELPER_PID" == "" ]; then
+		ensure_world_set_is_writable
+		local RET=$?
+		if [ $RET != 0 ]; then
+			echo "manipulate_world_set(): ensure_world_set_is_writable() returned $RET" >&2
+			return $RET
+		fi
+	fi
+	# send the command
+	#echo "manipulate_world_set(): sending: $*" >&2
+	echo "$*" >&3
+	# receive output
+	local BOUNDARY=""
+	read -ru 4 BOUNDARY
+	local BOUNDARY_OK=0
+	if [[ $BOUNDARY =~ ^###\ ([0-9]+)\ ([0-9]+)\ [0-9]+\ ###$ ]]; then
+		if [ "${BASH_REMATCH[1]} ${BASH_REMATCH[2]}" == "$$ $SUDO_HELPER_PID" ]; then
+			BOUNDARY_OK=1
+		fi
+	fi
+	if [ "$BOUNDARY_OK" != "1" ]; then
+		echo "manipulate_world_set(): invalid boundary: $BOUNDARY" >&2
+		echo "exit" >&3
+		return 1
+	fi
+	local LINE=""
+	read -ru 4 LINE
+	while [ "$LINE" != "$BOUNDARY" ]; do
+		#echo "manipulate_world_set(): GOT LINE=$LINE" >&2
+		echo "$LINE"
+		read -ru 4 LINE
+	done
+	# receive error code
+	read -ru 4 LINE
+	local RET=1
+	if [[ $LINE =~ ^[0-9]+$ ]]; then
+		RET=$LINE
+	fi
+	#echo "manipulate_world_set(): ending with CODE: $RET" >&2
+	return $RET
+}
+
 pacman_install() {
 	echo ">>> Mode: install $PKGS"
 	ensure_world_set_exists || exit $?
 	emerge_preview "$PKGS" ""
+	ensure_world_set_is_writable || exit $?
 	$PACMAN -S$PACMAN_S_OPTS $PKGS
 	local RET=$?
 	if [ $RET != 0 ]; then
@@ -313,14 +496,14 @@ pacman_install() {
 		for PKG in $PKGS ; do
 			if $PACMAN -T "$PKG" >/dev/null ; then
 				echo ">>> adding to world.set: $PKG"
-				echo "$PKG" >> "$EMERGE_CONF/world.set"
+				manipulate_world_set "echo \"$PKG\" >> \"$EMERGE_CONF/world.set\""
 				CLEANUP=1
 			else
 				echo ">>> failed to install: $PKG"
 			fi
 		done
 		if [ $CLEANUP == 1 ]; then
-			sort -u "$EMERGE_CONF/world.set" > "$EMERGE_CONF/world.set.tmp" && mv "$EMERGE_CONF/world.set.tmp" "$EMERGE_CONF/world.set"
+			manipulate_world_set "sort -u \"$EMERGE_CONF/world.set\" > \"$EMERGE_CONF/world.set.tmp\" && mv \"$EMERGE_CONF/world.set.tmp\" \"$EMERGE_CONF/world.set\""
 			RET=$?
 		fi
 	fi
@@ -331,6 +514,7 @@ pacman_depclean() {
 	echo ">>> Mode: depclean $PKGS"
 	ensure_world_set_exists || exit $?
 	emerge_preview "" "$PKGS"
+	ensure_world_set_is_writable || exit $?
 	$PACMAN -Rs$PACMAN_R_OPTS $PKGS
 	local RET=$?
 	if [ $RET != 0 ]; then
@@ -342,7 +526,7 @@ pacman_depclean() {
 				echo ">>> failed to depclean: $PKG"
 			else
 				echo ">>> removing from world.set: $PKG"
-				fgrep -xv "$PKG" "$EMERGE_CONF/world.set" > "$EMERGE_CONF/world.set.tmp" && mv "$EMERGE_CONF/world.set.tmp" "$EMERGE_CONF/world.set"
+				manipulate_world_set "fgrep -xv \"$PKG\" \"$EMERGE_CONF/world.set\" > \"$EMERGE_CONF/world.set.tmp\" && mv \"$EMERGE_CONF/world.set.tmp\" \"$EMERGE_CONF/world.set\""
 			fi
 		done
 	fi
@@ -374,6 +558,8 @@ standalone options:
        --sync                fetch latest package database updates
        -s --search -S --searchdesc  SEARCH_TERM
 					searches package database names and info for search_terms
+       --spawn-sudo-process  interally used to spawn a process for
+					modifying the configuration file
 general options:
        -1 --oneshot     install packages as non-explicit
        -a --ask         ask for user confirmation before proceeding
@@ -400,6 +586,12 @@ parseArgs() {
 				# our own additions
 				-h|--help) HELP=1 ;;
 				--rebuild-world-set) REBUILD_WORLD_SET=1 ;;
+				--spawn-sudo-process)
+					if [[ $1 =~ ^[0-9]+$ ]] ; then
+						SPAWN_SUDO_PROCESS="$1"
+						shift
+					fi
+					;;
 				# emerge compatibility flags
 				--sync) SYNC=1 ;;
 				-s|--search|-S|--searchdesc) SEARCH=1 ;;
@@ -470,6 +662,7 @@ parseArgs() {
 }
 
 # defaults for common emerge flags
+SPAWN_SUDO_PROCESS=0
 REBUILD_WORLD_SET=0
 SYNC=0
 SEARCH=0
@@ -527,6 +720,8 @@ fi
 if [ "$HELP" != "0" ]; then
 	show_help
 	exit 1
+elif [ $SPAWN_SUDO_PROCESS != 0 ]; then
+	sudo_process &
 elif [ $SEARCH != 0 -a -n "$PKGS" ]; then
 	echo ">>> search mode: $PKGS"
 	$PACMAN -Ss $PKGS
