@@ -203,8 +203,8 @@ rebuild_world_set() {
 	local RAWLINES=$( wc -l < "$SETFILE.raw" )
 	for PKG in $( cat "$SETFILE.raw" ) ; do
 		$PACMAN -Qi "$PKG" > /tmp/emerge_pacman_Qi
-		PGROUPS=$( egrep '^Groups *: ' < /tmp/emerge_pacman_Qi | cut -d: -f2 | sed -r 's/^ +//g ; s/ +$//g' )
-		REQDBY=$( egrep '^Required By *: ' < /tmp/emerge_pacman_Qi | cut -d: -f2 | sed -r 's/^ +//g ; s/ +$//g' )
+		PGROUPS=$( grep -E '^Groups *: ' < /tmp/emerge_pacman_Qi | cut -d: -f2 | sed -r 's/^ +//g ; s/ +$//g' )
+		REQDBY=$( grep -E '^Required By *: ' < /tmp/emerge_pacman_Qi | cut -d: -f2 | sed -r 's/^ +//g ; s/ +$//g' )
 		# determine parents
 		PARENTS=""
 		if [ "$PGROUPS" != "None" ]; then
@@ -239,7 +239,7 @@ rebuild_world_set() {
 	while read LINE ; do
 		LINE=$( sed -r 's/^(\S+) +: +/\1\t/g ; s/@\S+( +|$)//g' <<<"$LINE" )
 		read PKG PGROUPS <<<"$LINE"
-		if ! fgrep -xq "$PKG" "$SETFILE.raw" ; then
+		if ! grep -Fxq "$PKG" "$SETFILE.raw" ; then
 			true
 		elif [ -n "$PGROUPS" ]; then
 			echo -n "$PKG is explicit in set"
@@ -251,7 +251,7 @@ rebuild_world_set() {
 			done
 			if [ -n "$REQDBY" ]; then
 				echo ", but gets pulled in by:$REQDBY"
-				fgrep -xv "$PKG" "$SETFILE.raw" > "$SETFILE.tmp" && mv "$SETFILE.tmp" "$SETFILE.raw"
+				grep -Fxv "$PKG" "$SETFILE.raw" > "$SETFILE.tmp" && mv "$SETFILE.tmp" "$SETFILE.raw"
 				echo "$PKG" >> "$SETFILE.was_explicit"
 			else
 				echo -en "\r                                        \r"
@@ -285,7 +285,7 @@ rebuild_world_set() {
 			echo -n "replacing @$GROUP children in world.set: "
 			for PKG in $CHILDREN ; do
 				echo -n "$PKG "
-				fgrep -xv "$PKG" "$SETFILE.raw" > "$SETFILE.tmp" && mv "$SETFILE.tmp" "$SETFILE.raw"
+				grep -Fxv "$PKG" "$SETFILE.raw" > "$SETFILE.tmp" && mv "$SETFILE.tmp" "$SETFILE.raw"
 			done
 			echo "@$GROUP" >> "$SETFILE.raw"
 			echo ""
@@ -526,7 +526,7 @@ pacman_depclean() {
 				echo ">>> failed to depclean: $PKG"
 			else
 				echo ">>> removing from world.set: $PKG"
-				manipulate_world_set "fgrep -xv \"$PKG\" \"$EMERGE_CONF/world.set\" > \"$EMERGE_CONF/world.set.tmp\" && mv \"$EMERGE_CONF/world.set.tmp\" \"$EMERGE_CONF/world.set\""
+				manipulate_world_set "grep -Fxv \"$PKG\" \"$EMERGE_CONF/world.set\" > \"$EMERGE_CONF/world.set.tmp\" && mv \"$EMERGE_CONF/world.set.tmp\" \"$EMERGE_CONF/world.set\""
 			fi
 		done
 	fi
